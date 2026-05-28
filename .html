@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Strategy Dashboard & Arcade</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+    <style>
+        .tictactoe-cell { min-height: 80px; font-size: 2rem; cursor: pointer; }
+        #chess-board { width: 100%; max-width: 360px; margin: 0 auto; }
+        .active-log { animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        /* STYLE HIGHLIGHT BARU */
+        .highlight-square { box-shadow: inset 0 0 4px 4px #06b6d4 !important; }
+        .possible-move-hint { position: relative; }
+        .possible-move-hint::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px;
+            height: 16px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 50%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        /* Jika petak target ada bidak musuh yang bisa dimakan */
+        .possible-attack-hint { position: relative; }
+        .possible-attack-hint::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 36px;
+            height: 36px;
+            border: 4px solid rgba(0, 0, 0, 0.2);
+            border-radius: 50%;
+            z-index: 10;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen font-sans relative">
+
+    <!-- WARNING MODAL -->
+    <div id="warning-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="bg-gray-900 border-2 border-amber-500 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <div class="w-20 h-20 bg-amber-950 border border-amber-500/30 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl animate-bounce">
+                ⏳💀
+            </div>
+            <h3 class="text-2xl font-black text-amber-400 tracking-tight leading-snug mb-6">
+                cepet gerak co lama amat😹😂
+            </h3>
+            <button onclick="closeWarningModal()" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-gray-900 font-black rounded-xl shadow-lg cursor-pointer transition-all uppercase tracking-wide text-xs">
+                Iya Maaf, Gua Jalan Sekarang!
+            </button>
+        </div>
+    </div>
+
+    <!-- DEFEAT MODAL -->
+    <div id="defeat-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="bg-gray-900 border-2 border-red-500 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <div class="w-20 h-20 bg-red-950 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                👹
+            </div>
+            <h3 id="defeat-message" class="text-2xl font-black text-red-400 tracking-tight leading-snug mb-6">
+                kalo gak bisa main bapak lu suruh main🫵😂😹
+            </h3>
+            <button onclick="closeDefeatModal()" class="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-lg cursor-pointer transition-all uppercase tracking-wide text-xs">
+                Coba Lagi (Ganti Strategi)
+            </button>
+        </div>
+    </div>
+
+    <!-- HEADER WITH SOCIAL LINKS -->
+    <header class="bg-gray-900 p-4 border-b border-gray-800 shadow-md">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex flex-col md:flex-row items-center gap-4 text-center md:text-left">
+                <div>
+                    <h1 class="text-2xl font-black tracking-wider text-teal-400 flex items-center justify-center md:justify-start gap-2">
+                        <i class="fa-solid fa-brain-circuit"></i> AI CORE STRATEGY DASHBOARD
+                    </h1>
+                    <div class="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-1">
+                        <span class="text-xs text-gray-400">Live Telemetry & Game Engine Behavior</span>
+                        <span class="text-gray-700 hidden md:inline">|</span>
+                        <a href="https://t.me/im_gokil" target="_blank" class="text-xs font-bold text-sky-400 hover:text-sky-300 transition-all flex items-center gap-1">
+                            <i class="fa-brands fa-telegram"></i> @im_gokil
+                        </a>
+                        <a href="https://www.tiktok.com/@_santai6" target="_blank" class="text-xs font-bold text-pink-400 hover:text-pink-300 transition-all flex items-center gap-1">
+                            <i class="fa-brands fa-tiktok"></i> @_santai6
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="flex bg-gray-800 p-1 rounded-lg border border-gray-700">
+                <button id="tab-ttt" class="px-4 py-2 text-sm font-bold rounded-md bg-teal-500 text-gray-900 cursor-pointer transition-all">
+                    Tic-Tac-Toe AI Data
+                </button>
+                <button id="tab-chess" class="px-4 py-2 text-sm font-bold rounded-md text-gray-400 hover:text-white cursor-pointer transition-all">
+                    Chess AI Data
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN DASHBOARD -->
+    <main class="max-w-7xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-6 my-4">
+        
+        <!-- PANEL ARENA UTAMA -->
+        <div class="lg:col-span-5 bg-gray-900 p-5 rounded-xl border border-gray-800 shadow-xl flex flex-col justify-between">
+            <div>
+                <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
+                    <h2 id="game-title" class="text-lg font-bold text-teal-300">Tic-Tac-Toe Arena</h2>
+                    <div class="flex items-center gap-1.5 bg-gray-950 px-3 py-1 rounded-md border border-gray-800">
+                        <span class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Turn Time:</span>
+                        <span id="live-timer" class="text-sm font-mono font-black text-amber-400">00:00</span>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3 mb-4 text-xs">
+                    <div class="flex gap-2 justify-center">
+                        <button id="btn-mode-ai" class="flex-1 py-1.5 bg-teal-600 font-bold rounded text-white shadow">Lawan AI</button>
+                        <button id="btn-mode-friend" class="flex-1 py-1.5 bg-gray-800 rounded text-gray-400">Lawan Teman</button>
+                        <button id="btn-reset" class="px-3 py-1.5 bg-red-950 text-red-400 border border-red-900/50 hover:bg-red-900/50 rounded font-bold transition-all">Reset</button>
+                    </div>
+                    
+                    <div id="ai-difficulty-container" class="flex items-center justify-between bg-gray-950 p-2 rounded-lg border border-gray-800">
+                        <span class="text-[10px] uppercase tracking-wider font-bold text-gray-400 ml-1">AI Difficulty:</span>
+                        <div class="flex gap-1">
+                            <button id="btn-diff-easy" class="px-3 py-1 bg-gray-800 text-gray-400 font-bold rounded transition-all">EASY</button>
+                            <button id="btn-diff-normal" class="px-3 py-1 bg-teal-600 text-white font-bold rounded transition-all shadow">NORMAL</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="game-status" class="text-center font-semibold text-sm my-3 text-emerald-400 tracking-wide bg-emerald-950/20 py-2 rounded-lg border border-emerald-900/20">
+                    Menentukan koin giliran...
+                </div>
+            </div>
+
+            <!-- BOARD CONTAINER -->
+            <div class="my-auto py-4 flex justify-center items-center">
+                <div id="wrapper-ttt" class="w-full max-w-[280px] grid grid-cols-3 gap-2.5 bg-gray-800 p-3 rounded-xl shadow-inner">
+                    <button class="tictactoe-cell bg-gray-950 rounded-lg flex items-center justify-center font-black text-teal-400 border border-gray-800 focus:outline-none" data-idx="0"></button>
+                    <button class="tictactoe-cell bg-gray-950 rounded-lg flex items-center justify-center font-black text-teal-400 border border-gray-800 focus:outline-none" data-idx="1"></button>
+                    <button class="tictactoe-cell bg-gray-950 rounded-lg flex items-center justify-center font-black text-teal-400 border border-gray-800 focus:outline-none" data-idx="2"></button>
+                    <button class="tictactoe-cell bg-gray-950 rounded-lg flex items-center justify-center font-black text-teal-400 border border-gray-800 focus:outline-none" data-idx="3"></button>
+                    <button class="tictactoe-cell bg-gray-950 rounded-lg flex items-center justify-center font-black text-teal-400 border border-gray-800 focus:outline-none" data-idx="4"></button>
+                    <button class="tictactoe-cell bg-gray-950 rounded-lg flex items-center justify-center font-black text-teal-400 border border-gray-800 focus:outline-none" data-idx="5"></button>
+                    <button class="tictactoe-cell bg-gray-950 rounded-lg flex items-center justify-center font-black text-teal-400 border border-gray-800 focus:outline-none" data-idx="6"></button>
+                    <button class="tictactoe-cell bg-gray-950 rounded-lg flex items-center justify-center font-black text-teal-400 border border-gray-800 focus:outline-none" data-idx="7"></button>
+                    <button class="tictactoe-cell bg-gray-950 rounded-lg flex items-center justify-center font-black text-teal-400 border border-gray-800 focus:outline-none" data-idx="8"></button>
+                </div>
+
+                <div id="wrapper-chess" class="w-full hidden">
+                    <div id="chess-board" class="shadow-2xl rounded overflow-hidden border-2 border-gray-800"></div>
+                </div>
+            </div>
+
+            <div class="text-[11px] text-gray-500 text-center border-t border-gray-800 pt-3">
+                Peringatan Kecepatan Aktif: Jangan sampai mikir lebih dari 3 menit!
+            </div>
+        </div>
+
+        <!-- PANEL DATA TELEMETRI -->
+        <div class="lg:col-span-7 flex flex-col gap-4">
+            <div class="bg-gray-900 p-5 rounded-xl border border-gray-800 shadow-xl">
+                <div class="flex items-center gap-2 mb-4 text-sm font-bold uppercase tracking-wider text-amber-400">
+                    <i class="fa-solid fa-gauge-high"></i> Live AI Thinking State & Telemetry
+                </div>
+                
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                    <div class="bg-gray-950 p-3 rounded-lg border border-gray-800 text-center">
+                        <div class="text-[10px] text-gray-400 uppercase font-semibold">Algoritma Inti</div>
+                        <div id="data-algo" class="text-xs font-bold text-teal-400 mt-1">Minimax Alpha-Beta</div>
+                    </div>
+                    <div class="bg-gray-950 p-3 rounded-lg border border-gray-800 text-center">
+                        <div class="text-[10px] text-gray-400 uppercase font-semibold">Node Diperiksa</div>
+                        <div id="data-nodes" class="text-sm font-black text-purple-400 mt-1">0</div>
+                    </div>
+                    <div class="bg-gray-950 p-3 rounded-lg border border-gray-800 text-center">
+                        <div class="text-[10px] text-gray-400 uppercase font-semibold">Evaluasi Skor Posisi</div>
+                        <div id="data-score" class="text-sm font-black text-emerald-400 mt-1">0.0</div>
+                    </div>
+                    <div class="bg-gray-950 p-3 rounded-lg border border-gray-800 text-center">
+                        <div class="text-[10px] text-gray-400 uppercase font-semibold">Status Blunder</div>
+                        <div id="data-blunder" class="text-xs font-bold text-green-400 mt-1">0% SAFE</div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-950 p-3 rounded-lg border border-gray-800">
+                    <div class="text-xs text-gray-400 mb-2 flex justify-between">
+                        <span>Urutan Jalur Berpikir AI (Hirarki Prioritas):</span>
+                        <span class="text-teal-400 font-mono active-log text-[10px]">• SYSTEM ACTIVE</span>
+                    </div>
+                    <div id="priority-chain" class="flex flex-wrap items-center gap-1.5 text-[10px] font-mono"></div>
+                </div>
+            </div>
+
+            <div class="bg-gray-900 p-5 rounded-xl border border-gray-800 shadow-xl flex-1">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-teal-400">
+                        <i class="fa-solid fa-list-check"></i> Strategi Kepatuhan "Mesin Dingin"
+                    </div>
+                    <span class="text-[11px] bg-teal-400/10 text-teal-300 px-2 py-0.5 rounded border border-teal-500/20 font-mono">Live Validation</span>
+                </div>
+                <div id="strategy-checklist-container" class="space-y-2.5"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- REALTIME LOG CONSOLE -->
+    <footer class="max-w-7xl mx-auto px-4 mb-4">
+        <div class="bg-gray-900 p-4 rounded-xl border border-gray-800 font-mono text-xs text-gray-400 shadow-md">
+            <div class="flex items-center gap-2 text-gray-300 font-bold mb-2 border-b border-gray-800 pb-1.5">
+                <i class="fa-solid fa-terminal text-teal-400"></i> AI Decision Realtime Console Log
+            </div>
+            <div id="ai-console-log" class="h-24 overflow-y-auto space-y-1 text-[11px] text-teal-500/90">
+                [SYSTEM]: AI Dashboard Berhasil Dimuat.
+            </div>
+        </div>
+    </footer>
+
+    <!-- CREATOR BRANDING FOOTER -->
+    <div class="max-w-7xl mx-auto px-4 mb-12 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500 border-t border-gray-900 pt-4">
+        <div>
+            &copy; 2026 AI Strategy Dash Engine. All Rights Reserved.
+        </div>
+        <div class="flex items-center gap-4">
+            <span class="font-bold tracking-wider text-gray-400 uppercase text-[10px]">Creator Media:</span>
+            <a href="https://t.me/im_gokil" target="_blank" class="hover:text-sky-400 transition-all flex items-center gap-1">
+                <i class="fa-brands fa-telegram text-sky-500"></i> Telegram
+            </a>
+            <a href="https://www.tiktok.com/@_santai6" target="_blank" class="hover:text-pink-400 transition-all flex items-center gap-1">
+                <i class="fa-brands fa-tiktok text-pink-500"></i> TikTok
+            </a>
+        </div>
+    </div>
+
+    <script>
+        let activeTab = 'ttt'; 
+        let gameMode = 'ai'; 
+        let aiDifficulty = 'normal'; 
+        let currentFirstTurn = 'player'; 
+        let isAiThinking = false; 
+        
+        const tabTTT = document.getElementById('tab-ttt');
+        const tabChess = document.getElementById('tab-chess');
+        const wrapperTTT = document.getElementById('wrapper-ttt');
+        const wrapperChess = document.getElementById('wrapper-chess');
+        const gameTitle = document.getElementById('game-title');
+        const gameStatus = document.getElementById('game-status');
+        const btnModeAI = document.getElementById('btn-mode-ai');
+        const btnModeFriend = document.getElementById('btn-mode-friend');
+        const btnReset = document.getElementById('btn-reset');
+        const btnDiffEasy = document.getElementById('btn-diff-easy');
+        const btnDiffNormal = document.getElementById('btn-diff-normal');
+        const aiDifficultyContainer = document.getElementById('ai-difficulty-container');
+        const defeatModal = document.getElementById('defeat-modal');
+        const defeatMessage = document.getElementById('defeat-message');
+        const warningModal = document.getElementById('warning-modal');
+        const liveTimerDisplay = document.getElementById('live-timer');
+        
+        const dataAlgo = document.getElementById('data-algo');
+        const dataNodes = document.getElementById('data-nodes');
+        const dataScore = document.getElementById('data-score');
+        const dataBlunder = document.getElementById('data-blunder');
+        const priorityChain = document.getElementById('priority-chain');
+        const strategyChecklist = document.getElementById('strategy-checklist-container');
+        const consoleLog = document.getElementById('ai-console-log');
+
+        const roastingTextsNormal = ["kalo gak bisa main bapak lu suruh main🫵😂😹"];
+        const roastingTextEasy = "udah pilih easy kok kalah ups😂🤭";
+
+        let secondsElapsed = 0;
+        let timerInterval = null;
+
+        function startTurnTimer() {
+            clearInterval(timerInterval);
+            secondsElapsed = 0;
+            liveTimerDisplay.innerText = "00:00";
+            liveTimerDisplay.className = "text-sm font-mono font-black text-amber-400";
+
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                let mins = Math.floor(secondsElapsed / 60);
+                let secs = secondsElapsed % 60;
+                liveTimerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+                if (secondsElapsed === 180) {
+                    writeLog(`<span class="text-red-500 font-bold">[ALERT]: cepet gerak co lama amat😹😂</span>`);
+                    liveTimerDisplay.className = "text-sm font-mono font-black text-red-500 animate-pulse";
+                    triggerWarningModal();
+                }
+            }, 1000);
+        }
+
+        function stopTurnTimer() { clearInterval(timerInterval); }
+        function triggerWarningModal() { warningModal.classList.remove('hidden'); }
+        function closeWarningModal() { warningModal.classList.add('hidden'); }
+        
+        function triggerDefeatModal() {
+            stopTurnTimer();
+            if (aiDifficulty === 'easy') {
+                defeatMessage.innerText = roastingTextEasy;
+            } else {
+                const randomIndex = Math.floor(Math.random() * roastingTextsNormal.length);
+                defeatMessage.innerText = roastingTextsNormal[randomIndex];
+            }
+            defeatModal.classList.remove('hidden');
+        }
+        
+        function closeDefeatModal() {
+            defeatModal.classList.add('hidden');
+            activeTab === 'ttt' ? resetTTT() : resetChess();
+        }
+
+        tabTTT.addEventListener('click', () => switchTab('ttt'));
+        tabChess.addEventListener('click', () => switchTab('chess'));
+        
+        function switchTab(tab) {
+            activeTab = tab;
+            if (tab === 'ttt') {
+                tabTTT.className = "px-4 py-2 text-sm font-bold rounded-md bg-teal-500 text-gray-900 cursor-pointer";
+                tabChess.className = "px-4 py-2 text-sm font-bold rounded-md text-gray-400 hover:text-white cursor-pointer";
+                wrapperTTT.classList.remove('hidden');
+                wrapperChess.classList.add('hidden');
+                gameTitle.innerText = "Tic-Tac-Toe Arena";
+                resetTTT();
+            } else {
+                tabChess.className = "px-4 py-2 text-sm font-bold rounded-md bg-teal-500 text-gray-900 cursor-pointer";
+                tabTTT.className = "px-4 py-2 text-sm font-bold rounded-md text-gray-400 hover:text-white cursor-pointer";
+                wrapperChess.classList.remove('hidden');
+                wrapperTTT.classList.add('hidden');
+                gameTitle.innerText = "Chess Arena (Mesin Dingin)";
+                resetChess();
+                setTimeout(() => { chessBoardObj.resize(); }, 150);
+            }
+            writeLog(`[SYSTEM]: Berhasil berganti ke mode panel ${tab.toUpperCase()}`);
+        }
+
+        btnModeAI.addEventListener('click', () => setMode('ai'));
+        btnModeFriend.addEventListener('click', () => setMode('friend'));
+        btnReset.addEventListener('click', () => activeTab === 'ttt' ? resetTTT() : resetChess());
+
+        function setMode(mode) {
+            gameMode = mode;
+            if (mode === 'ai') {
+                btnModeAI.className = "flex-1 py-1.5 bg-teal-600 font-bold rounded text-white shadow";
+                btnModeFriend.className = "flex-1 py-1.5 bg-gray-800 rounded text-gray-400";
+                aiDifficultyContainer.classList.remove('hidden');
+            } else {
+                btnModeAI.className = "flex-1 py-1.5 bg-gray-800 rounded text-gray-400";
+                btnModeFriend.className = "flex-1 py-1.5 bg-teal-600 font-bold rounded text-white shadow";
+                aiDifficultyContainer.classList.add('hidden');
+            }
+            activeTab === 'ttt' ? resetTTT() : resetChess();
+        }
+
+        btnDiffEasy.addEventListener('click', () => setDifficulty('easy'));
+        btnDiffNormal.addEventListener('click', () => setDifficulty('normal'));
+
+        function setDifficulty(diff) {
+            aiDifficulty = diff;
+            if (diff === 'easy') {
+                btnDiffEasy.className = "px-3 py-1 bg-teal-600 text-white font-bold rounded shadow";
+                btnDiffNormal.className = "px-3 py-1 bg-gray-800 text-gray-400 font-bold rounded";
+                dataAlgo.innerText = "Heuristic Pattern Matcher";
+                dataBlunder.className = "text-xs font-bold text-amber-400 mt-1";
+                dataBlunder.innerText = "45% BLUNDER PRONE";
+            } else {
+                btnDiffNormal.className = "px-3 py-1 bg-teal-600 text-white font-bold rounded shadow";
+                btnDiffEasy.className = "px-3 py-1 bg-gray-800 text-gray-400 font-bold rounded";
+                dataAlgo.innerText = "Minimax Alpha-Beta";
+                dataBlunder.className = "text-xs font-bold text-green-400 mt-1";
+                dataBlunder.innerText = "0% SAFE";
+            }
+            activeTab === 'ttt' ? resetTTT() : resetChess();
+        }
+
+        function forceRandomizeTurn() {
+            if (gameMode === 'ai') {
+                currentFirstTurn = Math.random() < 0.5 ? 'player' : 'ai';
+                writeLog(`[COIN FLIP 50/50]: Hasil acak menetapkan -> <b>${currentFirstTurn.toUpperCase()}</b> jalan duluan!`);
+            } else {
+                currentFirstTurn = 'player';
+            }
+        }
+
+        function writeLog(text) {
+            const time = new Date().toLocaleTimeString();
+            consoleLog.innerHTML += `<div>[${time}] ${text}</div>`;
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+        }
+
+        // ================= STRATEGY DASHBOARD UTIL =================
+        const tttRules = [
+            { id: 'w1', desc: '1. JIKA BISA MENANG → Eksekusi Kemenangan langsung', active: false },
+            { id: 'w2', desc: '2. JIKA LAWAN MAU MENANG → Block Ancaman Segera', active: false },
+            { id: 'w3', desc: '3. TENGAH ADALAH POSISI TERKUAT → Ambil Jika Kosong', active: false },
+            { id: 'w4', desc: '4. CEGAH FORK (Dua Ancaman Sekaligus)', active: false },
+            { id: 'w5', desc: '5. AMBIL SUDUT (Prioritas Pojok daripada Sisi)', active: false }
+        ];
+
+        const chessRules = [
+            { id: 'c1', desc: 'MAIN SUPER SOLID: Utamakan Opening Stabil & Minim Kelemahan', active: true },
+            { id: 'c2', desc: 'ANTI-BLUNDER ENGINE: Validasi if Checkmate / Fork / Free Pieces', active: false },
+            { id: 'c3', desc: 'URUTAN BERPIKIR: King Safety → No Blunder → Control Center → Endgame Win', active: true },
+            { id: 'c4', desc: 'PRINSIP GRANDMASTER: Sukai ruang gerak luas, pion rapih, raja aman', active: false },
+            { id: 'c5', desc: 'MESIN DINGIN SYSTEM: Tukar bidak saat unggul material & kunci kelemahan permanen', active: false }
+        ];
+
+        const tttChain = ["WIN", "BLOCK", "FORK", "BLOCK FORK", "CENTER", "CORNER", "SIDE"];
+        const chessChain = ["KING SAFETY", "AVOID BLUNDER", "PROTECT PIECES", "CONTROL CENTER", "TACTICAL ATTACK", "ENDGAME WIN"];
+
+        function renderDashboardRules(rules, chain) {
+            priorityChain.innerHTML = chain.map((node, i) => `
+                <span class="bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded border border-gray-700">${node}</span>
+                ${i < chain.length - 1 ? '<i class="fa-solid fa-chevron-right text-gray-600 text-[8px]"></i>' : ''}
+            `).join('');
+
+            strategyChecklist.innerHTML = rules.map(rule => `
+                <div class="flex items-center justify-between p-2.5 rounded-lg border transition-all ${rule.active ? 'bg-teal-950/20 border-teal-800/60 text-teal-300 font-semibold' : 'bg-gray-950 border-gray-900 text-gray-400'} text-xs">
+                    <span class="flex items-center gap-2">
+                        <i class="${rule.active ? 'fa-solid fa-circle-check text-teal-400' : 'fa-regular fa-circle text-gray-600'}"></i>
+                        ${rule.desc}
+                    </span>
+                    <span class="text-[10px] font-mono font-bold ${rule.active ? 'text-teal-400' : 'text-gray-600'}">${rule.active ? 'ENGAGED' : 'READY'}</span>
+                </div>
+            `).join('');
+        }
+
+        // ================= TIC-TAC-TOE ENGINE =================
+        let tttBoard = Array(9).fill('');
+        let tttCurrentPlayer = 'X'; 
+        let tttActive = true;
+        const winStates = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+        document.querySelectorAll('.tictactoe-cell').forEach(cell => {
+            cell.addEventListener('click', (e) => {
+                if (isAiThinking || !tttActive || activeTab !== 'ttt') return; 
+                const idx = parseInt(e.target.getAttribute('data-idx'));
+                if (tttBoard[idx] !== '') return;
+                
+                executeTTTMove(idx, tttCurrentPlayer);
+                
+                if (checkTTTWin(tttBoard, tttCurrentPlayer)) {
+                    gameStatus.innerText = gameMode === 'ai' ? `Kamu (X) Menang! 🎉` : `Pemain ${tttCurrentPlayer} Menang! 🎉`;
+                    tttActive = false; stopTurnTimer(); return;
+                }
+                if (tttBoard.every(c => c !== '')) {
+                    gameStatus.innerText = "Pertandingan Seri! 🤝";
+                    tttActive = false; stopTurnTimer(); return;
+                }
+
+                if (gameMode === 'ai') {
+                    stopTurnTimer();
+                    isAiThinking = true;
+                    tttCurrentPlayer = 'O';
+                    gameStatus.innerText = "AI sedang berpikir...";
+                    setTimeout(executeTTTAIEngine, 400);
+                } else {
+                    tttCurrentPlayer = tttCurrentPlayer === 'X' ? 'O' : 'X';
+                    gameStatus.innerText = `Giliran Pemain ${tttCurrentPlayer}`;
+                    startTurnTimer();
+                }
+            });
+        });
+
+        function executeTTTMove(idx, player) {
+            tttBoard[idx] = player;
+            const el = document.querySelector(`[data-idx='${idx}']`);
+            el.innerText = player;
+            el.className = `tictactoe-cell bg-gray-950 rounded-lg flex items-center justify-center font-black border border-gray-800 ${player === 'X' ? 'text-teal-400' : 'text-amber-400'}`;
+        }
+
+        function checkTTTWin(board, player) {
+            return winStates.some(comb => comb.every(i => board[i] === player));
+        }
+
+        function executeTTTAIEngine() {
+            if (!tttActive) { isAiThinking = false; return; }
+            
+            let bestIndex = null;
+            let engagedRuleId = 'w3'; 
+            
+            let winMove = findImmediateImpactMove('O');
+            let blockMove = findImmediateImpactMove('X');
+
+            if (winMove !== null) {
+                bestIndex = winMove; engagedRuleId = 'w1';
+            } else if (blockMove !== null) {
+                bestIndex = blockMove; engagedRuleId = 'w2';
+            } else {
+                if (aiDifficulty === 'easy' && Math.random() > 0.6) {
+                    let blanks = tttBoard.map((v, i) => v === '' ? i : null).filter(v => v !== null);
+                    bestIndex = blanks[Math.floor(Math.random() * blanks.length)];
+                } else {
+                    let searchResult = minimaxTTT(tttBoard, 'O', 0);
+                    bestIndex = searchResult.index;
+                    dataNodes.innerText = searchResult.nodesCount;
+                }
+                if (bestIndex === 4) engagedRuleId = 'w3';
+                else engagedRuleId = 'w5';
+            }
+
+            tttRules.forEach(r => r.active = (r.id === engagedRuleId));
+            renderDashboardRules(tttRules, tttChain);
+
+            executeTTTMove(bestIndex, 'O');
+            isAiThinking = false; 
+
+            if (checkTTTWin(tttBoard, 'O')) {
+                gameStatus.innerText = "AI Menang! 🤖"; tttActive = false;
+                setTimeout(triggerDefeatModal, 400); return;
+            }
+            if (tttBoard.every(c => c !== '')) {
+                gameStatus.innerText = "Pertandingan Seri! 🤝"; tttActive = false; return;
+            }
+
+            tttCurrentPlayer = 'X';
+            gameStatus.innerText = "Giliran Kamu (X)";
+            startTurnTimer();
+        }
+
+        function findImmediateImpactMove(player) {
+            for (let i = 0; i < tttBoard.length; i++) {
+                if (tttBoard[i] === '') {
+                    let cp = [...tttBoard]; cp[i] = player;
+                    if (checkTTTWin(cp, player)) return i;
+                }
+            }
+            return null;
+        }
+
+        let nodesExplored = 0;
+        function minimaxTTT(newBoard, player, depth) {
+            nodesExplored++;
+            let availSpots = newBoard.map((v, i) => v === '' ? i : null).filter(v => v !== null);
+            if (checkTTTWin(newBoard, 'X')) return { score: -10 + depth, nodesCount: nodesExplored };
+            if (checkTTTWin(newBoard, 'O')) return { score: 10 - depth, nodesCount: nodesExplored };
+            if (availSpots.length === 0) return { score: 0, nodesCount: nodesExplored };
+
+            let moves = [];
+            for (let i = 0; i < availSpots.length; i++) {
+                let move = {}; move.index = availSpots[i];
+                newBoard[availSpots[i]] = player;
+                if (player === 'O') {
+                    let result = minimaxTTT(newBoard, 'X', depth + 1); move.score = result.score;
+                } else {
+                    let result = minimaxTTT(newBoard, 'O', depth + 1); move.score = result.score;
+                }
+                newBoard[availSpots[i]] = ''; moves.push(move);
+            }
+
+            let bestMove;
+            if (player === 'O') {
+                let bestScore = -10000;
+                for (let i = 0; i < moves.length; i++) { if (moves[i].score > bestScore) { bestScore = moves[i].score; bestMove = i; } }
+            } else {
+                let bestScore = 10000;
+                for (let i = 0; i < moves.length; i++) { if (moves[i].score < bestScore) { bestScore = moves[i].score; bestMove = i; } }
+            }
+            return { index: moves[bestMove].index, score: moves[bestMove].score, nodesCount: nodesExplored };
+        }
+
+        function resetTTT() {
+            tttBoard = Array(9).fill('');
+            tttActive = true;
+            nodesExplored = 0;
+            isAiThinking = false;
+            tttRules.forEach(r => r.active = false);
+            renderDashboardRules(tttRules, tttChain);
+            document.querySelectorAll('.tictactoe-cell').forEach(c => { c.innerText = ''; c.className = "tictactoe-cell bg-gray-950 rounded-lg flex items-center justify-center font-black text-teal-400 border border-gray-800 focus:outline-none"; });
+            
+            forceRandomizeTurn();
+
+            if (gameMode === 'ai' && currentFirstTurn === 'ai') {
+                isAiThinking = true;
+                tttCurrentPlayer = 'O';
+                gameStatus.innerText = "AI jalan duluan...";
+                stopTurnTimer();
+                setTimeout(executeTTTAIEngine, 600);
+            } else {
+                tttCurrentPlayer = 'X';
+                gameStatus.innerText = "Giliran Kamu (X)";
+                startTurnTimer();
+            }
+        }
+
+        // ================= CHESS ENGINE =================
+        let chessGame = new Chess();
+        let chessBoardObj = null;
+        let selectedSquare = null; 
+
+        function sumBoardWeights(currentBoard) {
+            let total = 0;
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    let piece = currentBoard[i][j];
+                    if (piece) {
+                        let baseValue = piece.type === 'p' ? 10 : piece.type === 'r' ? 50 : piece.type === 'n' ? 30 : piece.type === 'b' ? 30 : piece.type === 'q' ? 90 : 900;
+                        total += piece.color === 'w' ? baseValue : -baseValue;
+                    }
+                }
+            }
+            return total;
+        }
+
+        let totalChessNodes = 0;
+        function alphaBetaChess(depth, instance, alpha, beta, isMax) {
+            totalChessNodes++;
+            if (depth === 0) return -sumBoardWeights(instance.board());
+            let moves = instance.moves({verbose: true});
+            if (isMax) {
+                let best = -9999;
+                for (let i = 0; i < moves.length; i++) {
+                    instance.move(moves[i].san);
+                    best = Math.max(best, alphaBetaChess(depth - 1, instance, alpha, beta, false));
+                    instance.undo(); alpha = Math.max(alpha, best); if (beta <= alpha) break;
+                }
+                return best;
+            } else {
+                let best = 9999;
+                for (let i = 0; i < moves.length; i++) {
+                    instance.move(moves[i].san);
+                    best = Math.min(best, alphaBetaChess(depth - 1, instance, alpha, beta, true));
+                    instance.undo(); beta = Math.min(beta, best); if (beta <= alpha) break;
+                }
+                return best;
+            }
+        }
+
+        function triggerChessAI() {
+            if (chessGame.game_over()) { isAiThinking = false; return; }
+            totalChessNodes = 0;
+
+            let moves = chessGame.moves({verbose: true});
+            let bestMove = null; let bestValue = -9999;
+            let targetDepth = aiDifficulty === 'easy' ? 1 : 2;
+
+            for (let i = 0; i < moves.length; i++) {
+                chessGame.move(moves[i].san);
+                let value = alphaBetaChess(targetDepth, chessGame, -10000, 10000, false);
+                chessGame.undo();
+                if (value > bestValue) { bestValue = value; bestMove = moves[i].san; }
+            }
+
+            if (aiDifficulty === 'easy' && Math.random() > 0.7 && moves.length > 0) {
+                bestMove = moves[Math.floor(Math.random() * moves.length)].san;
+            }
+
+            chessGame.move(bestMove);
+            chessBoardObj.position(chessGame.fen());
+            
+            isAiThinking = false; 
+            updateChessUIStatus();
+            
+            if(!chessGame.game_over()){ startTurnTimer(); }
+        }
+
+        function removeHighlights() { 
+            $('#chess-board .square-55d63').removeClass('highlight-square possible-move-hint possible-attack-hint'); 
+        }
+
+        function showPossibleMovesHints(square) {
+            let moves = chessGame.moves({ square: square, verbose: true });
+            moves.forEach(move => {
+                let $targetSquare = $('#chess-board .square-' + move.to);
+                if (move.captured) {
+                    $targetSquare.addClass('possible-attack-hint');
+                } else {
+                    $targetSquare.addClass('possible-move-hint');
+                }
+            });
+        }
+
+        function handleSquareClick(square) {
+            if (chessGame.game_over() || isAiThinking) return; 
+            let piece = chessGame.get(square);
+            let currentTurnColor = chessGame.turn();
+
+            if (selectedSquare === null) {
+                if (piece) {
+                    if (gameMode === 'ai' && ((currentFirstTurn === 'player' && piece.color === 'b') || (currentFirstTurn === 'ai' && piece.color === 'w'))) return;
+                    if (gameMode === 'friend' && piece.color !== currentTurnColor) return;
+
+                    selectedSquare = square;
+                    removeHighlights();
+                    $('#chess-board .square-' + square).addClass('highlight-square');
+                    showPossibleMovesHints(square); 
+                }
+            } else {
+                let move = chessGame.move({ from: selectedSquare, to: square, promotion: 'q' });
+
+                if (move === null) {
+                    if (piece && piece.color === currentTurnColor) {
+                        if (gameMode === 'ai' && ((currentFirstTurn === 'player' && piece.color === 'b') || (currentFirstTurn === 'ai' && piece.color === 'w'))) {
+                            selectedSquare = null; removeHighlights(); return;
+                        }
+                        selectedSquare = square; removeHighlights();
+                        $('#chess-board .square-' + square).addClass('highlight-square');
+                        showPossibleMovesHints(square);
+                    } else { selectedSquare = null; removeHighlights(); }
+                } else {
+                    selectedSquare = null; 
+                    removeHighlights();
+                    chessBoardObj.position(chessGame.fen());
+                    updateChessUIStatus();
+                    stopTurnTimer();
+
+                    if (gameMode === 'ai' && !chessGame.game_over()) {
+                        isAiThinking = true;
+                        gameStatus.innerText = "AI sedang merancang serangan...";
+                        setTimeout(triggerChessAI, 500);
+                    } else if (gameMode === 'friend' && !chessGame.game_over()) {
+                        startTurnTimer();
+                    }
+                }
+            }
+        }
+
+        function updateChessUIStatus() {
+            let status = '';
+            let currentTurn = chessGame.turn();
+            let textTurn = currentTurn === 'w' ? 'Putih' : 'Hitam';
+            
+            if (chessGame.in_checkmate()) {
+                status = `SKAKMAT! Game Selesai.`;
+                stopTurnTimer();
+                if (gameMode === 'ai' && ((currentFirstTurn === 'player' && currentTurn === 'w') || (currentFirstTurn === 'ai' && currentTurn === 'b'))) {
+                    setTimeout(triggerDefeatModal, 500);
+                }
+            } else if (chessGame.in_draw()) {
+                status = 'Remis (Draw)!'; stopTurnTimer();
+            } else {
+                status = `Giliran: ${textTurn} ${chessGame.in_check() ? ' (SKAK!)' : ''}`;
+            }
+            gameStatus.innerText = status;
+        }
+
+        function resetChess() {
+            chessGame.reset();
+            selectedSquare = null;
+            removeHighlights();
+            isAiThinking = false;
+            
+            forceRandomizeTurn();
+            
+            if (gameMode === 'ai' && currentFirstTurn === 'ai') {
+                isAiThinking = true; 
+                chessBoardObj.orientation('black'); 
+                chessBoardObj.start();
+                updateChessUIStatus();
+                gameStatus.innerText = "AI (Putih) jalan duluan...";
+                stopTurnTimer();
+                setTimeout(triggerChessAI, 700);
+            } else {
+                chessBoardObj.orientation('white');
+                chessBoardObj.start();
+                updateChessUIStatus();
+                startTurnTimer();
+            }
+            
+            chessRules.forEach((r, i) => r.active = (i === 0 || i === 2));
+            renderDashboardRules(chessRules, chessChain);
+        }
+
+        chessBoardObj = Chessboard('chess-board', {
+            draggable: false, position: 'start',
+            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+        });
+        
+        $(document).on('click', '#chess-board .square-55d63', function() {
+            let square = $(this).attr('data-square');
+            handleSquareClick(square);
+        });
+
+        $(window).resize(chessBoardObj.resize);
+        renderDashboardRules(tttRules, tttChain);
+        
+        setTimeout(resetTTT, 200);
+    </script>
+</body>
+</html>
